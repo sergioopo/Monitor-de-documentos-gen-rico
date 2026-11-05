@@ -12,7 +12,7 @@ from urllib.parse import unquote, urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup
 
-DEFAULT_EXTENSIONS = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".odt", ".ods", ".csv", ".zip", ".7z"]
+DEFAULT_EXTENSIONS = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".odt", ".ods", ".csv", ".zip", ".7z", ".rtf"]
 MAX_BYTES = 45 * 1024 * 1024
 HEADERS = {"User-Agent": "DocumentosMonitor/1.1", "Accept-Language": "es-ES,es;q=0.9"}
 
@@ -64,10 +64,21 @@ def discover(source, html=None):
             continue
         path = unquote(parsed.path).lower()
         query = unquote(parsed.query).lower()
-        if not (path.endswith(extensions) or any(x in query for x in extensions)
-                or any(x in path for x in markers) or link.has_attr("download")):
+        link_type = link.get("type", "").lower()
+        is_document = (
+            path.endswith(extensions)
+            or any(x in query for x in extensions)
+            or any(x in path for x in markers)
+            or link.has_attr("download")
+            or (link_type.startswith("application/") and "html" not in link_type)
+        )
+        if not is_document:
             continue
-        title = link.get_text(" ", strip=True) or link.get("title") or unquote(Path(parsed.path).name) or "Documento"
+        title = (link.get_text(" ", strip=True)
+                 or link.get("aria-label", "").strip()
+                 or link.get("title", "").strip()
+                 or unquote(Path(parsed.path).name)
+                 or "Documento")
         key = hashlib.sha256((source["id"] + "|" + url).encode()).hexdigest()[:24]
         found[key] = {"title": title, "url": url}
     return found
