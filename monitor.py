@@ -6,6 +6,7 @@ import os
 import re
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import unquote, urljoin, urlparse
 
@@ -35,16 +36,57 @@ def load_sources(path):
     return sources
 
 
+RETRY_DELAYS = (5, 15)
+TRANSIENT_HTTP = {408, 429, 500, 502, 503, 504}
+
+
+def wait_seconds(response, attempt):
+    if response is not None and response.status_code == 429:
+        try:
+            return min(120, max(0, int(response.headers.get("Retry-After", ""))))
+        except (TypeError, ValueError):
+            pass
+    return RETRY_DELAYS[attempt]
+
+
 def get(url, timeout=30):
-    for attempt in range(2):
+    for attempt in range(3):
         try:
             result = requests.get(url, timeout=timeout, headers=HEADERS)
             result.raise_for_status()
             return result
-        except requests.RequestException:
-            if attempt:
+        except requests.RequestException as error:
+            response = getattr(error, "response", None)
+            if attempt == 2 or (response is not None and response.status_code not in TRANSIENT_HTTP):
                 raise
-            time.sleep(5)
+            delay = wait_seconds(response, attempt)
+            print(f"Web: intento {attempt + 1}/3 fallido; reintento en {delay} s")
+            time.sleep(delay)
+
+
+def telegram_post(token, data, files, timeout):
+    for attempt in range(3):
+        try:
+            result = requests.post(
+                f"https://api.telegram.org/bot{token}/sendDocument",
+                data=data, files=files, timeout=timeout,
+            )
+            result.raise_for_status()
+            if not result.json().get("ok"):
+                raise RuntimeError("Telegram no confirmó el envío")
+            return
+        except requests.RequestException as error:
+            response = getattr(error, "response", None)
+            if attempt == 2 or (response is not None and response.status_code not in TRANSIENT_HTTP):
+                raise
+            delay = wait_seconds(response, attempt)
+            if response is not None and response.status_code == 429:
+                try:
+                    delay = min(120, max(0, int(response.json()["parameters"]["retry_after"])))
+                except (KeyError, TypeError, ValueError):
+                    pass
+            print(f"Telegram: intento {attempt + 1}/3 fallido; reintento en {delay} s")
+            time.sleep(delay)
 
 
 def discover(source, html=None):
@@ -102,30 +144,19 @@ def send_document(source, item, token, chat):
     if "." not in filename:
         filename += ".pdf" if "pdf" in content_type else ".bin"
     caption = ("Nuevo documento · " + source["name"] + "\n" + item["title"] + "\n" + item["url"])[:1000]
-    result = requests.post(
-        f"https://api.telegram.org/bot{token}/sendDocument",
-        data={"chat_id": chat, "caption": caption},
-        files={"document": (filename, response.content, content_type)}, timeout=120)
-    result.raise_for_status()
-    if not result.json().get("ok"):
-        raise RuntimeError("Telegram no confirmó el envío")
-
+    telegram_post(token, {"chat_id": chat, "caption": caption},
+                  {"document": (filename, response.content, content_type)}, 120)
 
 def send_test(token, chat):
-    result = requests.post(
-        f"https://api.telegram.org/bot{token}/sendDocument",
-        data={"chat_id": chat, "caption": "Prueba de monitor genérico"},
-        files={"document": ("prueba.txt", b"Monitor conectado a Telegram.", "text/plain")},
-        timeout=30)
-    result.raise_for_status()
-    if not result.json().get("ok"):
-        raise RuntimeError("Telegram no confirmó la prueba")
-
+    telegram_post(token, {"chat_id": chat, "caption": "Prueba de monitor genérico"},
+                  {"document": ("prueba.txt", b"Monitor conectado a Telegram.", "text/plain")}, 30)
 
 def run(sources, state_path, dry_run=False, token="", default_chat=""):
     state_path = Path(state_path)
     state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
     errors = []
+    current_week = datetime.now(timezone.utc).strftime("%G-W%V")
+    timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     for source in sources:
         if not source.get("enabled", False):
             continue
@@ -146,6 +177,8 @@ def run(sources, state_path, dry_run=False, token="", default_chat=""):
                 state[sid] = {"url": source["url"], "processed": sorted(found)}
                 save_state(state_path, state)
                 print(f"{sid}: {reason}; {len(found)} documentos registrados sin enviar históricos")
+                state[sid].update({"heartbeat_week": current_week, "last_success": timestamp, "last_documents_found": len(found)})
+                save_state(state_path, state)
                 continue
             seen = set(previous["processed"])
             for key, item in found.items():
@@ -159,8 +192,14 @@ def run(sources, state_path, dry_run=False, token="", default_chat=""):
                 state[sid]["processed"] = sorted(seen)
                 save_state(state_path, state)
                 print(f"{sid}: enviado {item['title']}")
+            state[sid].pop("last_error", None)
+            state[sid].update({"heartbeat_week": current_week, "last_success": timestamp, "last_documents_found": len(found)})
+            save_state(state_path, state)
         except Exception as error:
             errors.append(sid)
+            if not dry_run and isinstance(state.get(sid), dict) and state[sid].get("url") == source["url"]:
+                state[sid]["last_error"] = {"at": timestamp, "message": f"{type(error).__name__}: {error}"[:400]}
+                save_state(state_path, state)
             print(f"ERROR {sid}: {type(error).__name__}: {error}", file=sys.stderr)
     return errors
 
