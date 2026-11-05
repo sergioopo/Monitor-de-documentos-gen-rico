@@ -29,7 +29,7 @@ Edita `sources.json` e incorpora un objeto por cada fuente:
 - `enabled`: activa la fuente (el ejemplo está desactivado).
 - `chat_id` opcional permite otro chat de Telegram para una fuente.
 
-La **primera ejecución** crea un inventario sin mandar documentos antiguos. Las siguientes envían solo enlaces nuevos. Los identificadores combinan fuente y URL.
+La **primera ejecución** crea un inventario sin mandar documentos antiguos. Las siguientes envían solo enlaces nuevos. Los identificadores combinan fuente y URL.\n\nSi modificas la **URL** de una fuente manteniendo el mismo `id`, el monitor detecta el cambio, crea automáticamente un **nuevo inventario inicial** y **no envía** los documentos históricos de la nueva página. El estado guarda la URL y los identificadores por fuente. Al actualizar desde una versión anterior con listas simples, se reconstruye el inventario inicial de cada fuente por seguridad.
 
 ## Configurar Telegram
 1. Crea un bot usando **@BotFather** y `/newbot`, añádelo a tu grupo.
@@ -41,7 +41,7 @@ La **primera ejecución** crea un inventario sin mandar documentos antiguos. Las
 Tras configurar una fuente real y los secretos, crea una tarea en https://cron-job.org cada 5 minutos:
 
 - Método: `POST`
-- URL: `https://api.github.com/repos/sergioopo/Monitor-de-documentos-gen-rico/actions/workflows/monitor.yml/dispatches`
+- URL: `https://api.github.com/repos/TU_USUARIO/TU_REPOSITORIO/actions/workflows/monitor.yml/dispatches`
 - Body JSON: `{"ref":"main","inputs":{"dry_run":"false","send_test":"false"}}`
 - Headers: `Authorization: Bearer TU_TOKEN`, `Accept: application/vnd.github+json`, `Content-Type: application/json`, `User-Agent: documentos-monitor`.
 
