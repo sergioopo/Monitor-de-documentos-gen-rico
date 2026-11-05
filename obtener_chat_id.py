@@ -2,6 +2,7 @@
 
 Se ejecuta manualmente desde GitHub Actions. No imprime tokens ni JSON.
 """
+import html
 import os
 import sys
 import time
@@ -60,7 +61,7 @@ def main():
                     api_call(
                         session, token, "sendMessage",
                         chat_id=chat_id,
-                        text=f"📋 ID actual de «{title}»: \\n<code>{chat_id}</code>\\n\\nCópialo en el secreto TELEGRAM_CHAT_ID de GitHub.",
+                        text=f"📋 ID actual de «{html.escape(title)}»: \n<code>{chat_id}</code>\n\nCópialo en el secreto TELEGRAM_CHAT_ID de GitHub.",
                         parse_mode="HTML",
                     )
                     print(f"ID enviado al grupo «{title}». Consulta Telegram.")
