@@ -19,6 +19,24 @@ class TestMonitor(unittest.TestCase):
         self.assertEqual([v["url"] for v in discover(self.source, html).values()],
                          ["https://example.org/uno.pdf"])
 
+    def test_type_application_y_aria_label(self):
+        html = ('<main><a href="/archivo/123" type="application/pdf" '
+                'aria-label="Resolución de prueba"></a>'
+                '<a href="/pagina" type="application/xhtml+xml">No es documento</a></main>')
+        found = list(discover(self.source, html).values())
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0]["title"], "Resolución de prueba")
+
+    def test_atributo_download_y_marcadores(self):
+        html = ('<main><a href="/fichero/123" download>Adjunto</a>'
+                '<a href="/descargas/456">Resolución</a></main>')
+        source = {**self.source, "download_markers": ["/descargas/"]}
+        self.assertEqual(len(discover(source, html)), 2)
+
+    def test_extension_en_query(self):
+        html = '<main><a href="/archivo?id=123&nombre=acta.pdf">Acta</a></main>'
+        self.assertEqual(len(discover(self.source, html)), 1)
+
     def test_deduplicacion(self):
         html = '<main><a href="/a.pdf">A</a><a href="/a.pdf">A</a></main>'
         self.assertEqual(len(discover(self.source, html)), 1)
