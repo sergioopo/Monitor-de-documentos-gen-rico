@@ -125,12 +125,18 @@ def run(sources, state_path, dry_run=False, token="", default_chat=""):
             if dry_run:
                 print(f"{sid}: simulación; sin envíos ni estado")
                 continue
-            if sid not in state:
-                state[sid] = sorted(found)
+            previous = state.get(sid)
+            # Formato antiguo: lista sin URL de origen. Se migra con un
+            # inventario seguro para evitar envíos masivos por cambio de web.
+            if (previous is None or isinstance(previous, list)
+                    or not isinstance(previous, dict)
+                    or previous.get("url") != source["url"]):
+                reason = "URL modificada" if isinstance(previous, dict) and previous.get("url") != source["url"] else "inventario inicial o migración"
+                state[sid] = {"url": source["url"], "processed": sorted(found)}
                 save_state(state_path, state)
-                print(f"{sid}: inventario inicial, sin reenviar históricos")
+                print(f"{sid}: {reason}; {len(found)} documentos registrados sin enviar históricos")
                 continue
-            seen = set(state[sid])
+            seen = set(previous["processed"])
             for key, item in found.items():
                 if key in seen:
                     continue
@@ -139,7 +145,7 @@ def run(sources, state_path, dry_run=False, token="", default_chat=""):
                     raise ValueError("Faltan TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID")
                 send_document(source, item, token, str(chat))
                 seen.add(key)
-                state[sid] = sorted(seen)
+                state[sid]["processed"] = sorted(seen)
                 save_state(state_path, state)
                 print(f"{sid}: enviado {item['title']}")
         except Exception as error:
