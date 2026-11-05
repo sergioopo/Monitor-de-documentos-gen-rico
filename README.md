@@ -33,8 +33,8 @@ La **primera ejecución** crea un inventario sin mandar documentos antiguos. Las
 
 ## Configurar Telegram
 1. Crea un bot usando **@BotFather** y `/newbot`, añádelo a tu grupo.
-2. Obtén el ID del grupo, por ejemplo con `getUpdates` después de enviar un comando al bot. No difundas el token del bot.
-3. En el repositorio, añade **Settings → Secrets and variables → Actions**: `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID`.
+2. Guarda primero el secreto `TELEGRAM_BOT_TOKEN`. Ve a **Actions → Obtener ID de Telegram → Run workflow**. Mientras se ejecuta, envía al grupo `/id@NombreDeTuBot` (sustituye el nombre por el de tu bot). El bot responderá **en el propio grupo** con su ID, sin mostrar JSON. Copia el número completo, incluido el signo negativo.\n   - El workflow escucha durante 90 segundos; si termina antes, ejecútalo otra vez. No se requiere `TELEGRAM_CHAT_ID` para este paso.\n   - Funciona en grupos y supergrupos. Si Telegram convierte el grupo en supergrupo, el ID puede cambiar: repite el procedimiento y actualiza el secreto `TELEGRAM_CHAT_ID`.\n   - No ejecutes simultáneamente otro consumidor de `getUpdates` ni mantengas un webhook activo para el mismo bot. No difundas el token del bot.
+3. En **Settings → Secrets and variables → Actions**, añade `TELEGRAM_CHAT_ID` con el número que te respondió el bot (el token ya se guardó en el paso anterior).
 4. En **Actions → Monitor genérico de documentos → Run workflow**, usa `send_test=true` para enviar un archivo de prueba. Usa `dry_run=true` para probar extracción sin enviar.
 
 ## Automatizar con cron-job.org
