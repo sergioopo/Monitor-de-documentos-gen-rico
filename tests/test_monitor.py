@@ -1,0 +1,59 @@
+import json
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from monitor import discover, load_sources, run
+
+
+class TestMonitor(unittest.TestCase):
+    def setUp(self):
+        self.source = {
+            "id": "prueba", "name": "Prueba", "url": "https://example.org/listado/",
+            "selector": "main a[href]", "extensions": [".pdf"], "enabled": True,
+        }
+
+    def test_filtro_y_enlaces_relativos(self):
+        html = '<a href="/fuera.pdf">Fuera</a><main><a href="../uno.pdf">Uno</a><a href="otro">No</a></main>'
+        self.assertEqual([v["url"] for v in discover(self.source, html).values()],
+                         ["https://example.org/uno.pdf"])
+
+    def test_deduplicacion(self):
+        html = '<main><a href="/a.pdf">A</a><a href="/a.pdf">A</a></main>'
+        self.assertEqual(len(discover(self.source, html)), 1)
+
+    def test_id_por_fuente(self):
+        html = '<main><a href="/a.pdf">A</a></main>'
+        self.assertNotEqual(list(discover(self.source, html)),
+                            list(discover({**self.source, "id": "otra"}, html)))
+
+    def test_inventario_y_envio_posterior(self):
+        first = discover(self.source, '<main><a href="/a.pdf">A</a></main>')
+        second = discover(self.source, '<main><a href="/a.pdf">A</a><a href="/b.pdf">B</a></main>')
+        with tempfile.TemporaryDirectory() as folder:
+            state = Path(folder) / "state.json"
+            with patch("monitor.discover", side_effect=[first, second]), patch("monitor.send_document") as send:
+                self.assertEqual(run([self.source], state), [])
+                send.assert_not_called()
+                self.assertEqual(run([self.source], state, token="test", default_chat="-100"), [])
+                send.assert_called_once()
+            self.assertEqual(len(json.loads(state.read_text())["prueba"]), 2)
+
+    def test_simulacion_sin_estado(self):
+        with tempfile.TemporaryDirectory() as folder:
+            state = Path(folder) / "state.json"
+            with patch("monitor.discover", return_value={}):
+                self.assertEqual(run([self.source], state, dry_run=True), [])
+            self.assertFalse(state.exists())
+
+    def test_identificador_duplicado(self):
+        with tempfile.TemporaryDirectory() as folder:
+            config = Path(folder) / "sources.json"
+            config.write_text(json.dumps({"sources": [self.source, self.source]}))
+            with self.assertRaises(ValueError):
+                load_sources(config)
+
+
+if __name__ == "__main__":
+    unittest.main()
