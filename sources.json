@@ -1,0 +1,13 @@
+{
+  "sources": [
+    {
+      "id": "ejemplo",
+      "name": "Portal de ejemplo (desactivado)",
+      "url": "https://example.org/documentos",
+      "selector": "main a[href]",
+      "extensions": [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".zip"],
+      "download_markers": ["/download/", "/documents/"],
+      "enabled": false
+    }
+  ]
+}
