@@ -38,7 +38,34 @@ class TestMonitor(unittest.TestCase):
                 send.assert_not_called()
                 self.assertEqual(run([self.source], state, token="test", default_chat="-100"), [])
                 send.assert_called_once()
-            self.assertEqual(len(json.loads(state.read_text())["prueba"]), 2)
+            self.assertEqual(len(json.loads(state.read_text())["prueba"]["processed"]), 2)
+
+    def test_cambio_de_url_crea_nuevo_inventario_sin_enviar(self):
+        first = discover(self.source, '<main><a href="/a.pdf">A</a></main>')
+        other = {**self.source, "url": "https://otra.example.org/documentos"}
+        changed = discover(other, '<main><a href="/nuevo.pdf">Nuevo</a></main>')
+        later = discover(other, '<main><a href="/nuevo.pdf">Nuevo</a><a href="/posterior.pdf">Posterior</a></main>')
+        with tempfile.TemporaryDirectory() as folder:
+            state = Path(folder) / "state.json"
+            with patch("monitor.discover", side_effect=[first, changed, later]), patch("monitor.send_document") as send:
+                self.assertEqual(run([self.source], state), [])
+                self.assertEqual(run([other], state, token="test", default_chat="-100"), [])
+                send.assert_not_called()
+                data = json.loads(state.read_text())["prueba"]
+                self.assertEqual(data["url"], other["url"])
+                self.assertEqual(len(data["processed"]), 1)
+                self.assertEqual(run([other], state, token="test", default_chat="-100"), [])
+                send.assert_called_once()
+
+    def test_migracion_de_estado_antiguo_sin_envios(self):
+        found = discover(self.source, '<main><a href="/a.pdf">A</a></main>')
+        with tempfile.TemporaryDirectory() as folder:
+            state = Path(folder) / "state.json"
+            state.write_text(json.dumps({"prueba": ["identificador_antiguo"]}))
+            with patch("monitor.discover", return_value=found), patch("monitor.send_document") as send:
+                self.assertEqual(run([self.source], state, token="test", default_chat="-100"), [])
+                send.assert_not_called()
+            self.assertEqual(json.loads(state.read_text())["prueba"]["url"], self.source["url"])
 
     def test_simulacion_sin_estado(self):
         with tempfile.TemporaryDirectory() as folder:
