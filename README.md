@@ -16,7 +16,7 @@ Edita `sources.json` e incorpora un objeto por cada fuente:
   "name": "Mi portal",
   "url": "https://example.org/documentos",
   "selector": "main a[href]",
-  "extensions": [".pdf", ".docx", ".xlsx", ".zip"],
+  "extensions": [".pdf", ".docx", ".xlsx", ".zip", ".rtf"],
   "download_markers": ["/download/", "/documents/"],
   "enabled": true
 }
@@ -25,7 +25,7 @@ Edita `sources.json` e incorpora un objeto por cada fuente:
 - `id`: único y estable; identifica el historial de cada web.
 - `url`: página HTML de inicio.
 - `selector`: selector CSS de enlaces descargables; por defecto `a[href]`.
-- `extensions`: tipos permitidos; `download_markers`: fragmentos de ruta para enlaces sin extensión.
+- `extensions`: tipos permitidos; `download_markers`: fragmentos de ruta para enlaces sin extensión. También se detectan enlaces con atributo HTML `download` o con `type="application/..."` (excepto HTML), igual que en el monitor original.
 - `enabled`: activa la fuente (el ejemplo está desactivado).
 - `chat_id` opcional permite otro chat de Telegram para una fuente.
 
