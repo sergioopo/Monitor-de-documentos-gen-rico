@@ -31,6 +31,13 @@ Edita `sources.json` e incorpora un objeto por cada fuente:
 
 La **primera ejecución** crea un inventario sin mandar documentos antiguos. Las siguientes envían solo enlaces nuevos. Los identificadores combinan fuente y URL.\n\nSi modificas la **URL** de una fuente manteniendo el mismo `id`, el monitor detecta el cambio, crea automáticamente un **nuevo inventario inicial** y **no envía** los documentos históricos de la nueva página. El estado guarda la URL y los identificadores por fuente. Al actualizar desde una versión anterior con listas simples, se reconstruye el inventario inicial de cada fuente por seguridad.
 
+## Reintentos y registro semanal
+Las consultas web, descargas y envíos a Telegram tienen **hasta 3 intentos**, con esperas de **5 y 15 segundos** ante errores de conexión o HTTP temporales (408, 429, 500, 502, 503, 504). Los errores permanentes como 401, 403 y 404 no se reintentan inmediatamente. En Telegram, un error 429 respeta el tiempo `retry_after` comunicado por la API (hasta 120 segundos).
+
+Cada fuente mantiene en `state.json` `heartbeat_week` (semana UTC), `last_success` (última ejecución correcta), `last_documents_found` (cantidad de enlaces detectados) y, si falla, `last_error`. El último éxito se conserva cuando ocurre un fallo. No se envían mensajes semanales adicionales.
+
+El inventario inicial sigue sin enviar documentos antiguos y `dry_run` no modifica el estado. Los reintentos de Telegram pueden generar duplicados si Telegram recibe el archivo pero se pierde su respuesta.
+
 ## Configurar Telegram
 1. Crea un bot usando **@BotFather** y `/newbot`, añádelo a tu grupo.
 2. Guarda primero el secreto `TELEGRAM_BOT_TOKEN`. Ve a **Actions → Obtener ID de Telegram → Run workflow**. Mientras se ejecuta, envía al grupo `/id@NombreDeTuBot` (sustituye el nombre por el de tu bot). El bot responderá **en el propio grupo** con su ID, sin mostrar JSON. Copia el número completo, incluido el signo negativo.\n   - El workflow escucha durante 90 segundos; si termina antes, ejecútalo otra vez. No se requiere `TELEGRAM_CHAT_ID` para este paso.\n   - Funciona en grupos y supergrupos. Si Telegram convierte el grupo en supergrupo, el ID puede cambiar: repite el procedimiento y actualiza el secreto `TELEGRAM_CHAT_ID`.\n   - No ejecutes simultáneamente otro consumidor de `getUpdates` ni mantengas un webhook activo para el mismo bot. No difundas el token del bot.
