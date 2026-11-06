@@ -159,7 +159,7 @@ def send_document(source, item, token, chat):
                   {"document": (filename, response.content, content_type)}, 120)
 
 def send_link(source, item, token, chat):
-    message = ("Nuevo enlace · " + source["name"] + "\\n" + item["title"] + "\\n" + item["url"])[:4096]
+    message = ("Nuevo enlace · " + source["name"] + "\n" + item["title"] + "\n" + item["url"])[:4096]
     telegram_post(token, {"chat_id": chat, "text": message, "disable_web_page_preview": True},
                   None, 30, method="sendMessage")
 
