@@ -1,6 +1,6 @@
 # Monitor genérico de documentos
 
-Monitor automático de múltiples páginas HTML para detectar enlaces a documentos y enviar **archivos adjuntos** a Telegram.
+Monitor automático de páginas HTML para detectar **documentos descargables y enlaces nuevos**. Envía los documentos como adjuntos y las páginas como mensajes de Telegram.
 
 Inspirado en [age-documentos-monitor](https://github.com/sergioopo/age-documentos-monitor), pero independiente del ranking AGE.
 
@@ -16,6 +16,9 @@ Edita `sources.json` e incorpora un objeto por cada fuente:
   "name": "Mi portal",
   "url": "https://example.org/documentos",
   "selector": "main a[href]",
+  "mode": "both",
+  "link_include": [],
+  "link_exclude": [],
   "extensions": [".pdf", ".docx", ".xlsx", ".zip", ".rtf"],
   "download_markers": ["/download/", "/documents/"],
   "enabled": true
@@ -26,15 +29,19 @@ Edita `sources.json` e incorpora un objeto por cada fuente:
 - `url`: página HTML de inicio.
 - `selector`: selector CSS de enlaces descargables; por defecto `a[href]`.
 - `extensions`: tipos permitidos; `download_markers`: fragmentos de ruta para enlaces sin extensión. También se detectan enlaces con atributo HTML `download` o con `type="application/..."` (excepto HTML), igual que en el monitor original.
+- `mode`: `documents` (predeterminado, compatible con las fuentes antiguas), `links` (solo páginas web) o `both` (ambos).
+- `link_include` y `link_exclude`: listas opcionales de palabras que se buscan en el título o URL **solo de enlaces web**; por ejemplo `["convocatoria", "resolución"]`. Las coincidencias no distinguen mayúsculas. Una lista vacía no filtra.
+- En modo `both`, los PDF se envían como adjuntos y las páginas HTML como mensajes con título y URL. **No se abren las páginas secundarias** ni se buscan documentos dentro de ellas.
+- El selector debe apuntar a los enlaces relevantes: con `a[href]` podrían notificarse menús y enlaces de navegación. Ajusta el selector y los filtros.
 - `enabled`: activa la fuente (el ejemplo está desactivado).
 - `chat_id` opcional permite otro chat de Telegram para una fuente.
 
-La **primera ejecución** crea un inventario sin mandar documentos antiguos. Las siguientes envían solo enlaces nuevos. Los identificadores combinan fuente y URL.\n\nSi modificas la **URL** de una fuente manteniendo el mismo `id`, el monitor detecta el cambio, crea automáticamente un **nuevo inventario inicial** y **no envía** los documentos históricos de la nueva página. El estado guarda la URL y los identificadores por fuente. Al actualizar desde una versión anterior con listas simples, se reconstruye el inventario inicial de cada fuente por seguridad.
+La **primera ejecución** crea un inventario sin mandar documentos o enlaces antiguos. Las siguientes envían solo enlaces nuevos. Los identificadores combinan fuente y URL. Al activar un nuevo tipo cambiando `mode`, los enlaces o documentos de ese tipo ya presentes se inventarían sin enviar avisos históricos; las novedades posteriores sí se notifican.\n\nSi modificas la **URL** de una fuente manteniendo el mismo `id`, el monitor detecta el cambio, crea automáticamente un **nuevo inventario inicial** y **no envía** los documentos históricos de la nueva página. El estado guarda la URL y los identificadores por fuente. Al actualizar desde una versión anterior con listas simples, se reconstruye el inventario inicial de cada fuente por seguridad.
 
 ## Reintentos y registro semanal
 Las consultas web, descargas y envíos a Telegram tienen **hasta 3 intentos**, con esperas de **5 y 15 segundos** ante errores de conexión o HTTP temporales (408, 429, 500, 502, 503, 504). Los errores permanentes como 401, 403 y 404 no se reintentan inmediatamente. En Telegram, un error 429 respeta el tiempo `retry_after` comunicado por la API (hasta 120 segundos).
 
-Cada fuente mantiene en `state.json` `heartbeat_week` (semana UTC), `last_success` (última ejecución correcta), `last_documents_found` (cantidad de enlaces detectados) y, si falla, `last_error`. El último éxito se conserva cuando ocurre un fallo. No se envían mensajes semanales adicionales.
+Cada fuente mantiene en `state.json` `heartbeat_week` (semana UTC), `last_success` (última ejecución correcta), `last_documents_found` (cantidad de elementos detectados, incluidos enlaces) y, si falla, `last_error`. El último éxito se conserva cuando ocurre un fallo. No se envían mensajes semanales adicionales.
 
 El inventario inicial sigue sin enviar documentos antiguos y `dry_run` no modifica el estado. Los reintentos de Telegram pueden generar duplicados si Telegram recibe el archivo pero se pierde su respuesta.
 
