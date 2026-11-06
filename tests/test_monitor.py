@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from monitor import discover, get, load_sources, run, telegram_post
+from monitor import discover, get, load_sources, run, telegram_post, send_link
 
 
 class TestMonitor(unittest.TestCase):
@@ -144,6 +144,39 @@ class TestMonitor(unittest.TestCase):
             record = json.loads(state.read_text())["prueba"]
             self.assertEqual(record["last_success"], previous)
             self.assertIn("last_error", record)
+
+    def test_modos_documentos_enlaces_y_ambos(self):
+        html = '<main><a href="/a.pdf">PDF</a><a href="/convocatoria">Convocatoria</a></main>'
+        self.assertEqual(len(discover(self.source, html)), 1)
+        only_links = discover({**self.source, "mode": "links"}, html)
+        self.assertEqual([v["kind"] for v in only_links.values()], ["link"])
+        both = discover({**self.source, "mode": "both"}, html)
+        self.assertEqual({v["kind"] for v in both.values()}, {"link", "document"})
+
+    def test_filtros_enlaces(self):
+        html = '<main><a href="/convocatoria">Nueva</a><a href="/contacto">Contacto</a></main>'
+        source = {**self.source, "mode": "links", "link_include": ["convocatoria"], "link_exclude": ["contacto"]}
+        self.assertEqual(len(discover(source, html)), 1)
+
+    def test_modo_nuevo_inventaria_sin_aviso(self):
+        first = discover(self.source, '<main><a href="/a.pdf">PDF</a></main>')
+        both = {**self.source, "mode": "both"}
+        second = discover(both, '<main><a href="/a.pdf">PDF</a><a href="/pagina">Página</a></main>')
+        third = discover(both, '<main><a href="/a.pdf">PDF</a><a href="/pagina">Página</a><a href="/nueva">Nueva</a></main>')
+        with tempfile.TemporaryDirectory() as folder:
+            state = Path(folder) / "state.json"
+            with patch("monitor.discover", side_effect=[first, second, third]), patch("monitor.send_link") as send:
+                self.assertEqual(run([self.source], state), [])
+                self.assertEqual(run([both], state), [])
+                send.assert_not_called()
+                self.assertEqual(run([both], state, token="test", default_chat="-100"), [])
+                send.assert_called_once()
+
+    def test_notificacion_enlace_usa_send_message(self):
+        with patch("monitor.telegram_post") as post:
+            send_link(self.source, {"title": "Nueva", "url": "https://example.org/nueva"}, "token", "-100")
+            self.assertEqual(post.call_args.kwargs["method"], "sendMessage")
+            self.assertIn("https://example.org/nueva", post.call_args.args[1]["text"])
 
     def test_identificador_duplicado(self):
         with tempfile.TemporaryDirectory() as folder:
