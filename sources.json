@@ -5,6 +5,9 @@
       "name": "Portal de ejemplo (desactivado)",
       "url": "https://example.org/documentos",
       "selector": "main a[href]",
+      "mode": "documents",
+      "link_include": [],
+      "link_exclude": [],
       "extensions": [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".zip"],
       "download_markers": ["/download/", "/documents/"],
       "enabled": false
