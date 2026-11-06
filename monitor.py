@@ -32,6 +32,8 @@ def load_sources(path):
         parsed = urlparse(source["url"])
         if parsed.scheme not in ("http", "https") or not parsed.hostname:
             raise ValueError("URL inválida: " + source["url"])
+        if source.get("mode", "documents") not in ("documents", "links", "both"):
+            raise ValueError("Modo inválido: " + sid)
         ids.add(sid)
     return sources
 
@@ -64,11 +66,11 @@ def get(url, timeout=30):
             time.sleep(delay)
 
 
-def telegram_post(token, data, files, timeout):
+def telegram_post(token, data, files, timeout, method="sendDocument"):
     for attempt in range(3):
         try:
             result = requests.post(
-                f"https://api.telegram.org/bot{token}/sendDocument",
+                f"https://api.telegram.org/bot{token}/{method}",
                 data=data, files=files, timeout=timeout,
             )
             result.raise_for_status()
@@ -96,6 +98,7 @@ def discover(source, html=None):
     extensions = tuple(x.lower() for x in source.get("extensions", DEFAULT_EXTENSIONS))
     markers = tuple(x.lower() for x in source.get("download_markers", []))
     found = {}
+    mode = source.get("mode", "documents")
     for link in soup.select(source.get("selector", "a[href]")):
         href = link.get("href")
         if not href:
@@ -114,15 +117,23 @@ def discover(source, html=None):
             or link.has_attr("download")
             or (link_type.startswith("application/") and "html" not in link_type)
         )
-        if not is_document:
+        kind = "document" if is_document else "link"
+        if (kind == "document" and mode == "links") or (kind == "link" and mode == "documents"):
             continue
+        if kind == "link":
+            haystack = (link.get_text(" ", strip=True) + " " + url).lower()
+            if any(word.lower() in haystack for word in source.get("link_exclude", [])):
+                continue
+            includes = source.get("link_include", [])
+            if includes and not any(word.lower() in haystack for word in includes):
+                continue
         title = (link.get_text(" ", strip=True)
                  or link.get("aria-label", "").strip()
                  or link.get("title", "").strip()
                  or unquote(Path(parsed.path).name)
                  or "Documento")
         key = hashlib.sha256((source["id"] + "|" + url).encode()).hexdigest()[:24]
-        found[key] = {"title": title, "url": url}
+        found[key] = {"title": title, "url": url, "kind": kind}
     return found
 
 
@@ -147,6 +158,12 @@ def send_document(source, item, token, chat):
     telegram_post(token, {"chat_id": chat, "caption": caption},
                   {"document": (filename, response.content, content_type)}, 120)
 
+def send_link(source, item, token, chat):
+    message = ("Nuevo enlace · " + source["name"] + "\\n" + item["title"] + "\\n" + item["url"])[:4096]
+    telegram_post(token, {"chat_id": chat, "text": message, "disable_web_page_preview": True},
+                  None, 30, method="sendMessage")
+
+
 def send_test(token, chat):
     telegram_post(token, {"chat_id": chat, "caption": "Prueba de monitor genérico"},
                   {"document": ("prueba.txt", b"Monitor conectado a Telegram.", "text/plain")}, 30)
@@ -163,7 +180,7 @@ def run(sources, state_path, dry_run=False, token="", default_chat=""):
         sid = source["id"]
         try:
             found = discover(source)
-            print(f"{sid}: {len(found)} documentos encontrados")
+            print(f"{sid}: {len(found)} elementos encontrados")
             if dry_run:
                 print(f"{sid}: simulación; sin envíos ni estado")
                 continue
@@ -174,12 +191,22 @@ def run(sources, state_path, dry_run=False, token="", default_chat=""):
                     or not isinstance(previous, dict)
                     or previous.get("url") != source["url"]):
                 reason = "URL modificada" if isinstance(previous, dict) and previous.get("url") != source["url"] else "inventario inicial o migración"
-                state[sid] = {"url": source["url"], "processed": sorted(found)}
+                state[sid] = {"url": source["url"], "processed": sorted(found), "mode": source.get("mode", "documents")}
                 save_state(state_path, state)
                 print(f"{sid}: {reason}; {len(found)} documentos registrados sin enviar históricos")
                 state[sid].update({"heartbeat_week": current_week, "last_success": timestamp, "last_documents_found": len(found)})
                 save_state(state_path, state)
                 continue
+            mode = source.get("mode", "documents")
+            previous_mode = previous.get("mode", "documents")
+            if mode != previous_mode:
+                kinds = {"documents": {"document"}, "links": {"link"}, "both": {"document", "link"}}
+                added = kinds[mode] - kinds[previous_mode]
+                previous["processed"] = sorted(set(previous["processed"]) | {
+                    key for key, item in found.items() if item.get("kind", "document") in added
+                })
+                previous["mode"] = mode
+                save_state(state_path, state)
             seen = set(previous["processed"])
             for key, item in found.items():
                 if key in seen:
@@ -187,7 +214,10 @@ def run(sources, state_path, dry_run=False, token="", default_chat=""):
                 chat = source.get("chat_id") or default_chat
                 if not token or not chat:
                     raise ValueError("Faltan TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID")
-                send_document(source, item, token, str(chat))
+                if item.get("kind", "document") == "link":
+                    send_link(source, item, token, str(chat))
+                else:
+                    send_document(source, item, token, str(chat))
                 seen.add(key)
                 state[sid]["processed"] = sorted(seen)
                 save_state(state_path, state)
