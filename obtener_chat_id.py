@@ -3,7 +3,6 @@
 Se ejecuta manualmente desde GitHub Actions. No imprime tokens ni JSON.
 """
 import html
-from datetime import datetime, timezone
 import os
 import sys
 import time
