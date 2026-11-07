@@ -8,8 +8,24 @@
       "mode": "documents",
       "link_include": [],
       "link_exclude": [],
-      "extensions": [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".zip"],
-      "download_markers": ["/download/", "/documents/"],
+      "extensions": [
+        ".pdf",
+        ".doc",
+        ".docx",
+        ".xls",
+        ".xlsx",
+        ".zip"
+      ],
+      "download_markers": [
+        "/download/",
+        "/downloads/",
+        "/documents/",
+        "/document_library/",
+        "/descarga/",
+        "/descargas/",
+        "/dam/",
+        "/sites/default/files/"
+      ],
       "enabled": true
     }
   ]
