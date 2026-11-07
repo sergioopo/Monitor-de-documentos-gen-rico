@@ -48,9 +48,9 @@ El inventario inicial sigue sin enviar documentos antiguos y `dry_run` no modifi
 ## Configurar Telegram (grupos y canales)
 1. Crea un bot con **@BotFather** y `/newbot`. Añádelo al **grupo** o como **administrador del canal**, con permiso para publicar mensajes.
 2. Guarda el secreto `TELEGRAM_BOT_TOKEN` en **Settings → Secrets and variables → Actions** de GitHub. Abre **Actions → Obtener ID de Telegram → Run workflow**.
-3. Cuando el paso **Esperar comando y responder en Telegram** esté activo, publica **/id@NombreDeTuBot** en el grupo o canal. El bot responderá allí con el ID. Copia el número completo (normalmente negativo).
-   - El workflow escucha durante **90 segundos**. En canales, debes publicar el comando como **una publicación del canal**; los comentarios en el grupo de discusión asociado no son publicaciones del canal.
-   - Si no responde, comprueba que el bot es administrador del canal y puede publicar, que el token corresponde al bot mencionado y que el comando se publicó durante los 90 segundos.
+3. Cuando el paso **Esperar comando y responder en Telegram** esté activo, escribe **/id@NombreDeTuBot** en un grupo o publica **cualquier mensaje nuevo** en el canal privado. El bot responderá allí con el ID. Copia el número completo (normalmente negativo).
+   - El workflow escucha durante **90 segundos**. En canales, publica un mensaje nuevo directamente **en el canal**; no sirve un comentario del grupo de discusión asociado. No hace falta usar /id.
+   - Si no responde, comprueba que el bot es administrador del canal y puede publicar, que el token corresponde al bot mencionado y que la publicación se hizo durante los 90 segundos. El registro muestra únicamente cantidades de tipos de actualizaciones, no el contenido de mensajes.
    - No mantengas un webhook activo ni otro consumidor de `getUpdates` del mismo bot al mismo tiempo.
 4. Guarda ese número como secreto `TELEGRAM_CHAT_ID`. En **Actions → Monitor genérico de documentos → Run workflow**, usa `send_test=true` para comprobar que llega un archivo; `dry_run=true` permite simular sin enviar ni guardar cambios.
 
