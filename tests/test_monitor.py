@@ -100,7 +100,7 @@ class TestMonitor(unittest.TestCase):
             with patch("monitor.discover", return_value=found):
                 self.assertEqual(run([self.source], state), [])
                 record = json.loads(state.read_text())["prueba"]
-                self.assertRegex(record["heartbeat_week"], r"^\\d{4}-W\\d{2}$")
+                self.assertRegex(record["heartbeat_week"], r"^\d{4}-W\d{2}$")
                 self.assertEqual(record["last_documents_found"], 1)
                 self.assertTrue(record["last_success"].endswith("Z"))
                 self.assertEqual(run([self.source], state), [])
