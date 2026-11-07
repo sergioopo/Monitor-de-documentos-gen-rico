@@ -1,4 +1,4 @@
-"""Obtiene el ID de un grupo mediante un comando enviado al propio bot.
+"""Obtiene el ID de un grupo o canal mediante un comando enviado al bot.
 
 Se ejecuta manualmente desde GitHub Actions. No imprime tokens ni JSON.
 """
@@ -37,36 +37,36 @@ def main():
         try:
             me = api_call(session, token, "getMe")
             username = me["username"]
-            print(f"Abre tu grupo y escribe /id@{username}")
+            print(f"En un grupo o canal con el bot, publica /id@{username}")
             print("Esperando el comando durante 90 segundos...")
             deadline = time.monotonic() + 90
             offset = None
             while time.monotonic() < deadline:
                 remaining = deadline - time.monotonic()
-                params = {"timeout": min(20, max(1, int(remaining))), "allowed_updates": '["message"]'}
+                params = {"timeout": min(20, max(1, int(remaining))), "allowed_updates": '["message","channel_post"]'}
                 if offset is not None:
                     params["offset"] = offset
                 updates = api_call(session, token, "getUpdates", **params)
                 for update in updates:
                     offset = update["update_id"] + 1
-                    msg = update.get("message") or {}
+                    msg = update.get("message") or update.get("channel_post") or {}
                     chat = msg.get("chat") or {}
-                    if chat.get("type") not in ("group", "supergroup"):
+                    if chat.get("type") not in ("group", "supergroup", "channel"):
                         continue
                     command = (msg.get("text") or "").split(maxsplit=1)[0].lower()
                     if command not in ("/id", f"/id@{username.lower()}"):
                         continue
                     chat_id = chat["id"]
-                    title = chat.get("title", "Grupo sin nombre")
+                    title = chat.get("title", "Chat sin nombre")
                     api_call(
                         session, token, "sendMessage",
                         chat_id=chat_id,
                         text=f"📋 ID actual de «{html.escape(title)}»: \n<code>{chat_id}</code>\n\nCópialo en el secreto TELEGRAM_CHAT_ID de GitHub.",
                         parse_mode="HTML",
                     )
-                    print(f"ID enviado al grupo «{title}». Consulta Telegram.")
+                    print(f"ID enviado a «{title}». Consulta Telegram.")
                     return 0
-            print("No llegó ningún comando. Repite el workflow y envía /id@NombreDeTuBot mientras esté ejecutándose.")
+            print("No llegó ningún comando de grupo o canal. Comprueba que el bot sea administrador del canal con permiso para publicar, y envía /id@NombreDeTuBot mientras se ejecuta el workflow.")
             return 1
         except (requests.RequestException, ValueError, KeyError, RuntimeError) as exc:
             print(f"No se pudo obtener el ID: {exc}", file=sys.stderr)
