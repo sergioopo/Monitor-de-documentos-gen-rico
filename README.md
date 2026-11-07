@@ -45,18 +45,21 @@ Cada fuente mantiene en `state.json` `heartbeat_week` (semana UTC), `last_succes
 
 El inventario inicial sigue sin enviar documentos antiguos y `dry_run` no modifica el estado. Los reintentos de Telegram pueden generar duplicados si Telegram recibe el archivo pero se pierde su respuesta.
 
-## Configurar Telegram
-1. Crea un bot usando **@BotFather** y `/newbot`, añádelo a tu grupo.
-2. Guarda primero el secreto `TELEGRAM_BOT_TOKEN`. Ve a **Actions → Obtener ID de Telegram → Run workflow**. Mientras se ejecuta, envía al grupo `/id@NombreDeTuBot` (sustituye el nombre por el de tu bot). El bot responderá **en el propio grupo** con su ID, sin mostrar JSON. Copia el número completo, incluido el signo negativo.\n   - El workflow escucha durante 90 segundos; si termina antes, ejecútalo otra vez. No se requiere `TELEGRAM_CHAT_ID` para este paso.\n   - Funciona en grupos y supergrupos. Si Telegram convierte el grupo en supergrupo, el ID puede cambiar: repite el procedimiento y actualiza el secreto `TELEGRAM_CHAT_ID`.\n   - No ejecutes simultáneamente otro consumidor de `getUpdates` ni mantengas un webhook activo para el mismo bot. No difundas el token del bot.
-3. En **Settings → Secrets and variables → Actions**, añade `TELEGRAM_CHAT_ID` con el número que te respondió el bot (el token ya se guardó en el paso anterior).
-4. En **Actions → Monitor genérico de documentos → Run workflow**, usa `send_test=true` para enviar un archivo de prueba. Usa `dry_run=true` para probar extracción sin enviar.
+## Configurar Telegram (grupos y canales)
+1. Crea un bot con **@BotFather** y `/newbot`. Añádelo al **grupo** o como **administrador del canal**, con permiso para publicar mensajes.
+2. Guarda el secreto `TELEGRAM_BOT_TOKEN` en **Settings → Secrets and variables → Actions** de GitHub. Abre **Actions → Obtener ID de Telegram → Run workflow**.
+3. Cuando el paso **Esperar comando y responder en Telegram** esté activo, publica **/id@NombreDeTuBot** en el grupo o canal. El bot responderá allí con el ID. Copia el número completo (normalmente negativo).
+   - El workflow escucha durante **90 segundos**. En canales, debes publicar el comando como **una publicación del canal**; los comentarios en el grupo de discusión asociado no son publicaciones del canal.
+   - Si no responde, comprueba que el bot es administrador del canal y puede publicar, que el token corresponde al bot mencionado y que el comando se publicó durante los 90 segundos.
+   - No mantengas un webhook activo ni otro consumidor de `getUpdates` del mismo bot al mismo tiempo.
+4. Guarda ese número como secreto `TELEGRAM_CHAT_ID`. En **Actions → Monitor genérico de documentos → Run workflow**, usa `send_test=true` para comprobar que llega un archivo; `dry_run=true` permite simular sin enviar ni guardar cambios.
 
 ## Automatizar con cron-job.org
-Tras configurar una fuente real y los secretos, crea una tarea en https://cron-job.org cada 5 minutos:
+Tras configurar una fuente real y los secretos, crea una tarea en https://cron-job.org cada 2 minutos (o cada 5 minutos si lo prefieres):
 
 - Método: `POST`
 - URL: `https://api.github.com/repos/TU_USUARIO/TU_REPOSITORIO/actions/workflows/monitor.yml/dispatches`
-- Body JSON: `{"ref":"main","inputs":{"dry_run":"false","send_test":"false"}}`
+- Body JSON: `{"ref":"main","inputs":{"send_test":"false"}}`
 - Headers: `Authorization: Bearer TU_TOKEN`, `Accept: application/vnd.github+json`, `Content-Type: application/json`, `User-Agent: documentos-monitor`.
 
 El token GitHub debe tener acceso **solo a este repositorio** y permiso **Actions: Read and write**. No lo publiques. Comprueba el resultado real del workflow en GitHub, no solo el HTTP del disparador.
