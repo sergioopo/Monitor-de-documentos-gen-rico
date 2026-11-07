@@ -26,7 +26,7 @@
         "/dam/",
         "/sites/default/files/"
       ],
-      "enabled": true
+      "enabled": false
     }
   ]
 }
